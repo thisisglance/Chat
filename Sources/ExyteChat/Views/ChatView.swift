@@ -798,12 +798,12 @@ public extension ChatView {
 }
 
 extension ChatView {
-    func inputBarHidden(_ hidden: Bool = true) -> some View {
+    public func inputBarHidden(_ hidden: Bool = true) -> some View {
         self.modifier(InputBarVisibilityModifier(isHidden: hidden))
     }
 }
 
-struct InputBarVisibilityModifier: ViewModifier {
+public struct InputBarVisibilityModifier: ViewModifier {
     let isHidden: Bool
     
     func body(content: Content) -> some View {
@@ -812,11 +812,11 @@ struct InputBarVisibilityModifier: ViewModifier {
     }
 }
 
-private struct InputBarHiddenKey: EnvironmentKey {
+public struct InputBarHiddenKey: EnvironmentKey {
     static let defaultValue: Bool = false
 }
 
-extension EnvironmentValues {
+public extension EnvironmentValues {
     var inputBarHidden: Bool {
         get { self[InputBarHiddenKey.self] }
         set { self[InputBarHiddenKey.self] = newValue }
