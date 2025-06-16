@@ -39,7 +39,7 @@ public struct ChatView<MessageContent: View, InputViewContent: View, MenuAction:
         _ showContextMenuClosure: @escaping () -> Void,
         _ messageActionClosure: @escaping (Message, DefaultMessageMenuAction) -> Void,
         _ showAttachmentClosure: @escaping (Attachment) -> Void
-    ) -> MessageContent)
+    ) -> MessageContent?)
     
     /// To build a custom input view use the following parameters passed by this closure:
     /// - binding to the text in input view
