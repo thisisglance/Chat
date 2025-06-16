@@ -23,6 +23,8 @@ public enum ReplyMode: CaseIterable, Sendable {
 
 public struct ChatView<MessageContent: View, InputViewContent: View, MenuAction: MessageMenuAction>: View {
     
+    @Environment(\.inputBarHidden) private var inputBarHidden
+
     /// To build a custom message view use the following parameters passed by this closure:
     /// - message containing user, attachments, etc.
     /// - position of message in its continuous group of messages from the same user
@@ -386,26 +388,32 @@ public struct ChatView<MessageContent: View, InputViewContent: View, MenuAction:
 
     var inputView: some View {
         Group {
-            if let inputViewBuilder = inputViewBuilder {
-                inputViewBuilder($inputViewModel.text, inputViewModel.attachments, inputViewModel.state, .message, inputViewModel.inputViewAction()) {
-                    globalFocusState.focus = nil
+            if !inputBarHidden {
+                Group {
+                    if let inputViewBuilder = inputViewBuilder {
+                        inputViewBuilder($inputViewModel.text, inputViewModel.attachments, inputViewModel.state, .message, inputViewModel.inputViewAction()) {
+                            globalFocusState.focus = nil
+                        }
+                    } else {
+                        InputView(
+                            viewModel: inputViewModel,
+                            inputFieldId: viewModel.inputFieldId,
+                            style: .message,
+                            availableInputs: availableInputs,
+                            messageStyler: messageStyler,
+                            recorderSettings: recorderSettings,
+                            localization: localization
+                        )
+                    }
                 }
-            } else {
-                InputView(
-                    viewModel: inputViewModel,
-                    inputFieldId: viewModel.inputFieldId,
-                    style: .message,
-                    availableInputs: availableInputs,
-                    messageStyler: messageStyler,
-                    recorderSettings: recorderSettings,
-                    localization: localization
-                )
+                .sizeGetter($inputViewSize)
+                .environmentObject(globalFocusState)
+                .onAppear(perform: inputViewModel.onStart)
+                .onDisappear(perform: inputViewModel.onStop)
+                .transition(.move(edge: .bottom).combined(with: .opacity))
             }
         }
-        .sizeGetter($inputViewSize)
-        .environmentObject(globalFocusState)
-        .onAppear(perform: inputViewModel.onStart)
-        .onDisappear(perform: inputViewModel.onStop)
+        .animation(.easeInOut(duration: 0.3), value: inputBarHidden)
     }
     
     func messageMenu(_ row: MessageRow) -> some View {
@@ -787,4 +795,30 @@ public extension ChatView {
             id: "Mwh6", user: juliet, status: .sent, createdAt: tuesday,
             text: "That I shall say 'Good night' till it be morrow"),
     ]) { draft in }
+}
+
+extension ChatView {
+    func inputBarHidden(_ hidden: Bool = true) -> some View {
+        self.modifier(InputBarVisibilityModifier(isHidden: hidden))
+    }
+}
+
+struct InputBarVisibilityModifier: ViewModifier {
+    let isHidden: Bool
+    
+    func body(content: Content) -> some View {
+        content
+            .environment(\.inputBarHidden, isHidden)
+    }
+}
+
+private struct InputBarHiddenKey: EnvironmentKey {
+    static let defaultValue: Bool = false
+}
+
+extension EnvironmentValues {
+    var inputBarHidden: Bool {
+        get { self[InputBarHiddenKey.self] }
+        set { self[InputBarHiddenKey.self] = newValue }
+    }
 }
