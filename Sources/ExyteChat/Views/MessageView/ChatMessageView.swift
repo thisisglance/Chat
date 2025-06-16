@@ -50,21 +50,21 @@ struct ChatMessageView<MessageContent: View>: View {
         }
         .id(row.message.id)
     }
-}
-
-private var defaultMessageView: some View {
-    MessageView(
-        viewModel: viewModel,
-        message: row.message,
-        positionInUserGroup: row.positionInUserGroup,
-        positionInMessagesSection: row.positionInMessagesSection,
-        chatType: chatType,
-        avatarSize: avatarSize,
-        tapAvatarClosure: tapAvatarClosure,
-        messageStyler: messageStyler,
-        shouldShowLinkPreview: shouldShowLinkPreview,
-        isDisplayingMessageMenu: isDisplayingMessageMenu,
-        showMessageTimeView: showMessageTimeView,
-        messageLinkPreviewLimit: messageLinkPreviewLimit,
-        font: messageFont)
+    
+    private func defaultMessageView() -> some View {
+        MessageView(
+            viewModel: viewModel,
+            message: row.message,
+            positionInUserGroup: row.positionInUserGroup,
+            positionInMessagesSection: row.positionInMessagesSection,
+            chatType: chatType,
+            avatarSize: avatarSize,
+            tapAvatarClosure: tapAvatarClosure,
+            messageStyler: messageStyler,
+            shouldShowLinkPreview: shouldShowLinkPreview,
+            isDisplayingMessageMenu: isDisplayingMessageMenu,
+            showMessageTimeView: showMessageTimeView,
+            messageLinkPreviewLimit: messageLinkPreviewLimit,
+            font: messageFont)
+    }
 }
