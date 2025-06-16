@@ -9,7 +9,7 @@ import SwiftUI
 
 struct ChatMessageView<MessageContent: View>: View {
 
-    typealias MessageBuilderClosure = ChatView<MessageContent, EmptyView, DefaultMessageMenuAction>.MessageBuilderClosure
+    typealias MessageBuilderClosure = (MessageType, PositionInUserGroup, PositionInCommentsGroup, PositionInCommentsGroup, @escaping () -> Void, @escaping (MessageMenuAction) -> Void, @escaping (AttachmentType) -> Void) -> MessageContent?
 
     @ObservedObject var viewModel: ChatViewModel
 
@@ -29,7 +29,7 @@ struct ChatMessageView<MessageContent: View>: View {
     var body: some View {
         Group {
             if let messageBuilder = messageBuilder {
-                messageBuilder(
+                let customView = messageBuilder(
                     row.message,
                     row.positionInUserGroup,
                     row.positionInMessagesSection,
@@ -38,23 +38,33 @@ struct ChatMessageView<MessageContent: View>: View {
                     viewModel.messageMenuAction()) { attachment in
                         self.viewModel.presentAttachmentFullScreen(attachment)
                     }
+                
+                if let customView = customView {
+                    customView
+                } else {
+                    defaultMessageView
+                }
             } else {
-                MessageView(
-                    viewModel: viewModel,
-                    message: row.message,
-                    positionInUserGroup: row.positionInUserGroup,
-                    positionInMessagesSection: row.positionInMessagesSection,
-                    chatType: chatType,
-                    avatarSize: avatarSize,
-                    tapAvatarClosure: tapAvatarClosure,
-                    messageStyler: messageStyler,
-                    shouldShowLinkPreview: shouldShowLinkPreview,
-                    isDisplayingMessageMenu: isDisplayingMessageMenu,
-                    showMessageTimeView: showMessageTimeView,
-                    messageLinkPreviewLimit: messageLinkPreviewLimit,
-                    font: messageFont)
+                defaultMessageView
             }
         }
         .id(row.message.id)
     }
+}
+
+private var defaultMessageView: some View {
+    MessageView(
+        viewModel: viewModel,
+        message: row.message,
+        positionInUserGroup: row.positionInUserGroup,
+        positionInMessagesSection: row.positionInMessagesSection,
+        chatType: chatType,
+        avatarSize: avatarSize,
+        tapAvatarClosure: tapAvatarClosure,
+        messageStyler: messageStyler,
+        shouldShowLinkPreview: shouldShowLinkPreview,
+        isDisplayingMessageMenu: isDisplayingMessageMenu,
+        showMessageTimeView: showMessageTimeView,
+        messageLinkPreviewLimit: messageLinkPreviewLimit,
+        font: messageFont)
 }
