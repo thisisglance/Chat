@@ -806,14 +806,14 @@ extension ChatView {
 public struct InputBarVisibilityModifier: ViewModifier {
     let isHidden: Bool
     
-    func body(content: Content) -> some View {
+    public func body(content: Content) -> some View {
         content
             .environment(\.inputBarHidden, isHidden)
     }
 }
 
 public struct InputBarHiddenKey: EnvironmentKey {
-    static let defaultValue: Bool = false
+    public static let defaultValue: Bool = false
 }
 
 public extension EnvironmentValues {
