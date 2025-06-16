@@ -28,24 +28,19 @@ struct ChatMessageView<MessageContent: View>: View {
 
     var body: some View {
         Group {
-            if let messageBuilder = messageBuilder {
-                let customView = messageBuilder(
-                    row.message,
-                    row.positionInUserGroup,
-                    row.positionInMessagesSection,
-                    row.commentsPosition,
-                    { viewModel.messageMenuRow = row },
-                    viewModel.messageMenuAction()) { attachment in
-                        self.viewModel.presentAttachmentFullScreen(attachment)
-                    }
-                
-                if let customView = customView {
-                    customView
-                } else {
-                    defaultMessageView
-                }
+            if let messageBuilder = messageBuilder,
+               let customView = messageBuilder(
+                row.message,
+                row.positionInUserGroup,
+                row.positionInMessagesSection,
+                row.commentsPosition,
+                { viewModel.messageMenuRow = row },
+                viewModel.messageMenuAction()) { attachment in
+                self.viewModel.presentAttachmentFullScreen(attachment)
+            } {
+                customView
             } else {
-                defaultMessageView
+                defaultMessageView()
             }
         }
         .id(row.message.id)
