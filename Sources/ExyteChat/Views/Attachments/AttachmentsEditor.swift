@@ -54,11 +54,10 @@ struct AttachmentsEditor<InputViewContent: View>: View {
         GeometryReader { g in
             ZStack {
                 MediaPicker(isPresented: $inputViewModel.showPicker) { selectedMedias in
-                    // Check if we have videos that need fixing
                     let hasVideo = selectedMedias.contains { $0.type == .video }
                     
                     if hasVideo {
-                        // VIDEO FLOW: Special handling with loading overlay
+                        // VIDEO FLOW: Fix and auto-send
                         isFixingVideo = true
                         inputViewModel.showPicker = false
                         
@@ -79,18 +78,10 @@ struct AttachmentsEditor<InputViewContent: View>: View {
                                 if selectedMedias.count == 1 {
                                     currentFullscreenMedia = selectedMedias.first
                                 }
-                            }
-                            
-                            try? await Task.sleep(nanoseconds: 100_000_000)
-                            
-                            await MainActor.run {
-                                inputViewModel.showPicker = true
-                            }
-                            
-                            try? await Task.sleep(nanoseconds: 100_000_000)
-                            
-                            await MainActor.run {
+                                
+                                assembleSelectedMedia()
                                 isFixingVideo = false
+                                inputViewModel.send()
                             }
                         }
                     } else {
@@ -180,30 +171,7 @@ struct AttachmentsEditor<InputViewContent: View>: View {
 
     func assembleSelectedMedia() {
         if !seleсtedMedias.isEmpty {
-            // For videos, fix orientation before assembling
-            let hasVideo = seleсtedMedias.contains { $0.type == .video }
-            
-            if hasVideo {
-                inputViewModel.attachments.medias = []
-                
-                Task {
-                    var processedMedias: [Media] = []
-                    
-                    for media in seleсtedMedias {
-                        if media.type == .video, let url = await media.getURL() {
-                            _ = await videoFixer.fixOrientationIfNeeded(sourceURL: url)
-                        }
-                        processedMedias.append(media)
-                    }
-                    
-                    await MainActor.run {
-                        inputViewModel.attachments.medias = processedMedias
-                    }
-                }
-            } else {
-                // Images: original simple assignment
-                inputViewModel.attachments.medias = seleсtedMedias
-            }
+            inputViewModel.attachments.medias = seleсtedMedias
         } else if let media = currentFullscreenMedia {
             inputViewModel.attachments.medias = [media]
         } else {
