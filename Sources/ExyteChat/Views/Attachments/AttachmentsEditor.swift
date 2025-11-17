@@ -8,6 +8,7 @@
 import SwiftUI
 import ExyteMediaPicker
 import ActivityIndicatorView
+import AVFoundation
 
 struct AttachmentsEditor<InputViewContent: View>: View {
     
@@ -21,6 +22,7 @@ struct AttachmentsEditor<InputViewContent: View>: View {
     @EnvironmentObject private var globalFocusState: GlobalFocusState
 
     @ObservedObject var inputViewModel: InputViewModel
+    @State private var videoFixer = VideoOrientationFixer()
 
     var inputViewBuilder: InputViewBuilderClosure?
     var chatTitle: String?
@@ -32,6 +34,7 @@ struct AttachmentsEditor<InputViewContent: View>: View {
 
     @State private var seleсtedMedias: [Media] = []
     @State private var currentFullscreenMedia: Media?
+    @State private var isFixingVideo = false
 
     var showingAlbums: Bool {
         inputViewModel.mediaPickerMode == .albums
@@ -49,74 +52,158 @@ struct AttachmentsEditor<InputViewContent: View>: View {
 
     var mediaPicker: some View {
         GeometryReader { g in
-            MediaPicker(isPresented: $inputViewModel.showPicker) {
-                seleсtedMedias = $0
-                assembleSelectedMedia()
-            } albumSelectionBuilder: { _, albumSelectionView, _ in
-                VStack {
-                    albumSelectionHeaderView
-                        .padding(.top, g.safeAreaInsets.top)
-                    albumSelectionView
-                    Spacer()
-                    inputView
-                        .padding(.bottom, g.safeAreaInsets.bottom)
-                }
-                .background(mediaPickerTheme.main.pickerBackground.ignoresSafeArea())
-            } cameraSelectionBuilder: { _, cancelClosure, cameraSelectionView in
-                VStack {
-                    cameraSelectionView
-                        .overlay(alignment: .top) {
-                            cameraSelectionHeaderView(cancelClosure: cancelClosure)
-                                .padding(.top, 12)
+            ZStack {
+                MediaPicker(isPresented: $inputViewModel.showPicker) { selectedMedias in
+                    // Check if we have videos that need fixing
+                    let hasVideo = selectedMedias.contains { $0.type == .video }
+                    
+                    if hasVideo {
+                        // VIDEO FLOW: Special handling with loading overlay
+                        isFixingVideo = true
+                        inputViewModel.showPicker = false
+                        
+                        Task {
+                            await MainActor.run {
+                                currentFullscreenMedia = nil
+                            }
+                            
+                            for media in selectedMedias {
+                                if media.type == .video, let url = await media.getURL() {
+                                    _ = await videoFixer.fixOrientationIfNeeded(sourceURL: url)
+                                }
+                            }
+                            
+                            await MainActor.run {
+                                seleсtedMedias = selectedMedias
+                                
+                                if selectedMedias.count == 1 {
+                                    currentFullscreenMedia = selectedMedias.first
+                                }
+                            }
+                            
+                            try? await Task.sleep(nanoseconds: 100_000_000)
+                            
+                            await MainActor.run {
+                                inputViewModel.showPicker = true
+                            }
+                            
+                            try? await Task.sleep(nanoseconds: 100_000_000)
+                            
+                            await MainActor.run {
+                                isFixingVideo = false
+                            }
                         }
-                        .padding(.top, g.safeAreaInsets.top)
-                    Spacer()
-                    inputView
-                        .padding(.bottom, g.safeAreaInsets.bottom)
+                    } else {
+                        // IMAGE FLOW: Original simple flow
+                        seleсtedMedias = selectedMedias
+                        assembleSelectedMedia()
+                    }
+                } albumSelectionBuilder: { _, albumSelectionView, _ in
+                    VStack {
+                        albumSelectionHeaderView
+                            .padding(.top, g.safeAreaInsets.top)
+                        albumSelectionView
+                        Spacer()
+                        inputView
+                            .padding(.bottom, g.safeAreaInsets.bottom)
+                    }
+                    .background(mediaPickerTheme.main.pickerBackground.ignoresSafeArea())
+                } cameraSelectionBuilder: { _, cancelClosure, cameraSelectionView in
+                    VStack {
+                        cameraSelectionView
+                            .overlay(alignment: .top) {
+                                cameraSelectionHeaderView(cancelClosure: cancelClosure)
+                                    .padding(.top, 12)
+                            }
+                            .padding(.top, g.safeAreaInsets.top)
+                        Spacer()
+                        inputView
+                            .padding(.bottom, g.safeAreaInsets.bottom)
+                    }
+                    .background(mediaPickerTheme.main.pickerBackground.ignoresSafeArea())
                 }
-                .background(mediaPickerTheme.main.pickerBackground.ignoresSafeArea())
-            }
-            .didPressCancelCamera {
-                inputViewModel.showPicker = false
-            }
-            .currentFullscreenMedia($currentFullscreenMedia)
-            .showLiveCameraCell()
-            .setSelectionParameters(mediaPickerSelectionParameters)
-            .pickerMode($inputViewModel.mediaPickerMode)
-            .orientationHandler(orientationHandler)
-            .padding(.top)
-            .background(theme.colors.mainBG)
-            .ignoresSafeArea(.all)
-            .onChange(of: currentFullscreenMedia) {
-                assembleSelectedMedia()
-            }
-            .onChange(of: inputViewModel.showPicker) {
-                let showFullscreenPreview = mediaPickerSelectionParameters?.showFullscreenPreview ?? true
-                let selectionLimit = mediaPickerSelectionParameters?.selectionLimit ?? 1
-
-                if selectionLimit == 1 && !showFullscreenPreview {
+                .didPressCancelCamera {
+                    inputViewModel.showPicker = false
+                }
+                .currentFullscreenMedia($currentFullscreenMedia)
+                .showLiveCameraCell()
+                .setSelectionParameters(mediaPickerSelectionParameters)
+                .pickerMode($inputViewModel.mediaPickerMode)
+                .orientationHandler(orientationHandler)
+                .padding(.top)
+                .background(theme.colors.mainBG)
+                .ignoresSafeArea(.all)
+                .onChange(of: currentFullscreenMedia) {
                     assembleSelectedMedia()
-                    inputViewModel.send()
                 }
-            }
-            .applyIf(!mediaPickerThemeIsOverridden) {
-                $0.mediaPickerTheme(
-                    main: .init(
-                        pickerText: theme.colors.mainText,
-                        pickerBackground: theme.colors.mainBG,
-                        fullscreenPhotoBackground: theme.colors.mainBG
-                    ),
-                    selection: .init(
-                        accent: theme.colors.sendButtonBackground
+                .onChange(of: inputViewModel.showPicker) {
+                    let showFullscreenPreview = mediaPickerSelectionParameters?.showFullscreenPreview ?? true
+                    let selectionLimit = mediaPickerSelectionParameters?.selectionLimit ?? 1
+
+                    if selectionLimit == 1 && !showFullscreenPreview {
+                        assembleSelectedMedia()
+                        inputViewModel.send()
+                    }
+                }
+                .applyIf(!mediaPickerThemeIsOverridden) {
+                    $0.mediaPickerTheme(
+                        main: .init(
+                            pickerText: theme.colors.mainText,
+                            pickerBackground: theme.colors.mainBG,
+                            fullscreenPhotoBackground: theme.colors.mainBG
+                        ),
+                        selection: .init(
+                            accent: theme.colors.sendButtonBackground
+                        )
                     )
-                )
+                }
+                
+                // Loading overlay - only for videos
+                if isFixingVideo {
+                    Color.black
+                        .ignoresSafeArea()
+                        .overlay {
+                            VStack(spacing: 16) {
+                                ProgressView()
+                                    .tint(.white)
+                                    .scaleEffect(1.5)
+                                Text("Processing video...")
+                                    .foregroundColor(.white)
+                                    .font(.headline)
+                            }
+                        }
+                        .zIndex(999)
+                }
             }
         }
     }
 
     func assembleSelectedMedia() {
         if !seleсtedMedias.isEmpty {
-            inputViewModel.attachments.medias = seleсtedMedias
+            // For videos, fix orientation before assembling
+            let hasVideo = seleсtedMedias.contains { $0.type == .video }
+            
+            if hasVideo {
+                inputViewModel.attachments.medias = []
+                
+                Task {
+                    var processedMedias: [Media] = []
+                    
+                    for media in seleсtedMedias {
+                        if media.type == .video, let url = await media.getURL() {
+                            _ = await videoFixer.fixOrientationIfNeeded(sourceURL: url)
+                        }
+                        processedMedias.append(media)
+                    }
+                    
+                    await MainActor.run {
+                        inputViewModel.attachments.medias = processedMedias
+                    }
+                }
+            } else {
+                // Images: original simple assignment
+                inputViewModel.attachments.medias = seleсtedMedias
+            }
         } else if let media = currentFullscreenMedia {
             inputViewModel.attachments.medias = [media]
         } else {
